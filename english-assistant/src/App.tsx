@@ -1,26 +1,35 @@
-import React from 'react';
-import logo from './logo.svg';
-import './App.css';
+import '@/styles/globals.css';
+// import '@/styles/atom-one-dark.css';
+import 'highlight.js/styles/atom-one-dark.css';
+import { useState } from 'react';
+import {
+  MantineProvider,
+  ColorSchemeProvider,
+  ColorScheme,
+} from '@mantine/core';
+import { Notifications } from '@mantine/notifications';
 
-function App() {
+export default function App(props: any) {
+  const [colorScheme, setColorScheme] =
+    useState<ColorScheme>('light');
+  const toggleColorScheme = (value?: ColorScheme) => {
+    setColorScheme(
+      value || (colorScheme === 'dark' ? 'light' : 'dark')
+    );
+  };
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.tsx</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
-    </div>
+    <ColorSchemeProvider
+      colorScheme={colorScheme}
+      toggleColorScheme={toggleColorScheme}>
+      <MantineProvider
+        theme={{ colorScheme, primaryColor: 'green' }}
+        withNormalizeCSS
+        withGlobalStyles>
+        <Notifications
+          position='top-right'
+          zIndex={2077}></Notifications>
+        {props.children}
+      </MantineProvider>
+    </ColorSchemeProvider>
   );
 }
-
-export default App;
