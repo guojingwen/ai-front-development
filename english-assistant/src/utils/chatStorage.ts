@@ -99,7 +99,7 @@ export const updateSession = (
 
 export const removeSession = (id: string) => {
   const list = getSesssionStore();
-  const newList = list.filter((session) => session.id === id);
+  const newList = list.filter((session) => session.id !== id);
   updateSessionStore(newList);
   return newList;
 };

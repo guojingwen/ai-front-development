@@ -20,7 +20,7 @@ export const EdittableText = (props: Props) => {
   const onBlur = () => {
     if (isEditing) {
       setIsEditing(false);
-      setText(props.text);
+      props.onSave(text);
     }
   };
   if (isEditing) {
