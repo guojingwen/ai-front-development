@@ -1,14 +1,16 @@
 import React, { useEffect, useState } from 'react';
-import * as chatStorage from '@/utils/chatStorage';
-import { SessionList } from '@/types';
+import * as sessionStore from '@/dbs/sessionStore';
+import { Session, SessionList } from '@/types';
 import { useMantineColorScheme, ActionIcon } from '@mantine/core';
 import { IconTrash, IconMessagePlus } from '@tabler/icons-react';
 import clsx from 'clsx';
 import { EdittableText } from '../EdittableText';
+import events from '@/utils/event';
+import { useGetState } from '@/utils/hooks';
 
 type Props = {
-  sessionId: string;
-  onChange: (arg: string) => void;
+  session: Session;
+  onChange: (arg: Session) => void;
 };
 const itemBaseClasses =
   'flex cursor-pointer h-[2.4rem] items-center justify-around group px-4 rounded-md';
@@ -31,31 +33,51 @@ const generateItemClasses = (
   ]);
 };
 
-const Session = ({ sessionId, onChange }: Props) => {
-  const [sessionList, setSessionList] = useState<SessionList>([]);
+const SessionComp = ({ session, onChange }: Props) => {
+  const [, setSessionList, getSessionList] = useGetState<SessionList>(
+    []
+  );
   const { colorScheme } = useMantineColorScheme();
-  useEffect(() => {
-    const list = chatStorage.getSesssionStore();
-    setSessionList(list);
-  }, []);
-  const createSession = () => {
-    const newSession = {
-      name: `session=${sessionList.length + 1}`,
-      id: Date.now().toString(),
+  const createSession = async () => {
+    if (localStorage.emptySessionId) return;
+    const sessionId = Date.now().toString();
+    localStorage.emptySessionId = sessionId;
+    const newSession: Session = {
+      name: `session=${getSessionList().length + 1}`,
+      id: sessionId,
+      assistantId: localStorage.assistantId,
     };
-    onChange(newSession.id);
-    const list = chatStorage.addSession(newSession as any);
+    const list = await sessionStore.addSession(newSession);
     setSessionList(list);
+    onChange(newSession);
   };
-  const removeSession = (id: string) => {
-    let list = chatStorage.removeSession(id);
-    if (sessionId === id) {
-      onChange(list[0].id);
+  useEffect(() => {
+    sessionStore.getSessions().then(setSessionList);
+    events.on('switchToNewSession', async () => {
+      if (localStorage.emptySessionId) {
+        const sessionList = await sessionStore.getSessions();
+        onChange(sessionList[0]);
+      } else {
+        createSession();
+      }
+    });
+  }, []);
+  const removeSession = async (id: string) => {
+    if (localStorage.emptySessionId === id) {
+      localStorage.emptySessionId = '';
     }
+    await sessionStore.removeSession(id);
+    const list = getSessionList().filter(
+      (session) => session.id !== id
+    );
+    onChange(list[0]);
     setSessionList(list);
   };
-  const updateSession = (id: string, name: string) => {
-    const newSessionList = chatStorage.updateSession(id, { name });
+  const updateSession = async (_session: Session, name: string) => {
+    const newSessionList = await sessionStore.updateSession({
+      ..._session,
+      name,
+    });
     setSessionList(newSessionList);
   };
   return (
@@ -88,28 +110,32 @@ const Session = ({ sessionId, onChange }: Props) => {
           'flex-col',
           'gap-y-2',
         ])}>
-        {sessionList.map(({ id, name }) => (
+        {getSessionList().map((_session) => (
           <div
-            key={id}
-            onClick={() => onChange(id)}
+            key={_session.id}
+            onClick={() => {
+              if (_session.id !== session.id) {
+                onChange(_session);
+              }
+            }}
             className={generateItemClasses(
-              id,
-              sessionId,
+              _session.id,
+              session.id,
               colorScheme
             )}>
             <EdittableText
-              text={name}
+              text={_session.name}
               onSave={(name) =>
-                updateSession(id, name)
+                updateSession(_session, name)
               }></EdittableText>
             {/* <div>{name}</div> */}
-            {sessionList.length > 1 ? (
+            {getSessionList().length > 1 ? (
               <IconTrash
                 size='.8rem'
                 color='grey'
                 onClick={(event) => {
                   event.stopPropagation();
-                  removeSession(id);
+                  removeSession(_session.id);
                 }}
                 className='mx-1 invisible group-hover:visible'></IconTrash>
             ) : null}
@@ -120,4 +146,4 @@ const Session = ({ sessionId, onChange }: Props) => {
   );
 };
 
-export default Session;
+export default SessionComp;

@@ -3,6 +3,7 @@ import { ActionIcon, Modal, Input, Button } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { useState, ChangeEvent, useEffect } from 'react';
 import { API_KEY } from '@/utils/constant';
+import events from '@/utils/event';
 const Wrapper = Input.Wrapper;
 
 export default function Setting() {
@@ -15,8 +16,17 @@ export default function Setting() {
     setApiKey(apiKey); // API_KEY;
     localStorage[API_KEY] = apiKey;
     drawerHandler.close();
+    const cb = (window as any).needTokenFn;
+    if (cb instanceof Function) {
+      cb();
+      delete (window as any).needTokenFn;
+    }
   };
   useEffect(() => {
+    events.on('needToken', (cb: Function) => {
+      (window as any).needTokenFn = cb;
+      drawerHandler.open();
+    });
     setApiKey(localStorage[API_KEY] || '');
   }, []);
   return (

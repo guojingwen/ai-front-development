@@ -1,6 +1,6 @@
-import { EditAssistant } from '@/types';
+import { EditAssistant, Model } from '@/types';
 import React, { FormEvent, useState } from 'react';
-import { Button, Input } from '@mantine/core';
+import { Button, Input, Select } from '@mantine/core';
 import { IconDeviceFloppy, IconTrash } from '@tabler/icons-react';
 
 const { Wrapper } = Input;
@@ -38,6 +38,17 @@ const AssistantConfig = ({ assistant, save, remove }: Props) => {
       [name]: value,
     });
   };
+  const models = [
+    'gpt-3.5-turbo',
+    'gpt-4-vision-preview',
+    'gpt-4-1106-preview',
+  ];
+  const onModelChange = (value: Model) => {
+    setData({
+      ...data,
+      model: value,
+    });
+  };
   return (
     <div className='w-full flex justify-center'>
       <form
@@ -58,6 +69,18 @@ const AssistantConfig = ({ assistant, save, remove }: Props) => {
             name='prompt'
             onChange={(val) => onChange(val, 'prompt')}></Input>
         </Wrapper>
+        <Wrapper label='model' description='选择model'>
+          <Select
+            size='sm'
+            onChange={onModelChange}
+            value={data.model}
+            className='w-40 mx-2'
+            data={models.map((item) => ({
+              value: item,
+              label: item,
+            }))}></Select>
+        </Wrapper>
+
         <Wrapper label='创意度' description='数值越大，创意度越高'>
           <Input
             type='number'

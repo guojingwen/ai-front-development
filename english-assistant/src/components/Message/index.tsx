@@ -7,30 +7,34 @@ import {
   Loader,
   useMantineColorScheme,
 } from '@mantine/core';
-import * as chatStorage from '@/utils/chatStorage';
+import * as messageStore from '@/dbs/messageStore';
 import {
   IconSend,
   IconSendOff,
   IconEraser,
 } from '@tabler/icons-react';
-import { USERMAP } from '@/utils/constant';
+import { API_KEY, USERMAP } from '@/utils/constant';
+import events from '@/utils/event';
 
-import { Assistant, MessageList } from '@/types';
+import {
+  Assistant,
+  Message,
+  MessageList,
+  SendMessage,
+  Session,
+} from '@/types';
 import clsx from 'clsx';
 
 type Props = {
-  sessionId: string;
+  session: Session;
   assistant: Assistant;
 };
-const Message = ({ sessionId, assistant }: Props) => {
+const MessageComp = ({ session, assistant }: Props) => {
   const [prompt, setPrompt] = useState('');
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState<MessageList>([]);
+  const [messages, setMessageList] = useState<MessageList>([]);
+
   const { colorScheme } = useMantineColorScheme();
-  const updateMessage = (msg: MessageList) => {
-    setMessage(msg);
-    chatStorage.updateMessage(sessionId, msg);
-  };
 
   chatService.actions = {
     onCompleting: (sug) => setSuggestion(sug),
@@ -41,16 +45,18 @@ const Message = ({ sessionId, assistant }: Props) => {
   };
 
   useEffect(() => {
-    const msg = chatStorage.getMessage(sessionId);
-    setMessage(msg);
-    chatStorage.updateMessage(sessionId, msg);
-    if (loading) {
-      chatService.cancel();
-    }
-  }, [sessionId]);
+    (async () => {
+      const msgs = await messageStore.getMessages(session.id);
+      setMessageList(msgs);
+      if (loading) {
+        chatService.cancel();
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session.id]);
 
   const onClear = () => {
-    updateMessage([]);
+    console.log('todo onClear');
   };
   const onKeyDown = (evt: KeyboardEvent<HTMLTextAreaElement>) => {
     if (evt.keyCode === 13 && !evt.shiftKey) {
@@ -61,52 +67,62 @@ const Message = ({ sessionId, assistant }: Props) => {
 
   const setSuggestion = (suggestion: string) => {
     if (suggestion === '') return;
-    const len = message.length;
-    const lastMsg = message[len - 1];
+    const len = messages.length;
+    const lastMsg = messages[len - 1];
     let newList: MessageList = [];
     if (lastMsg?.role === 'assistant') {
-      newList = [
-        ...message.slice(0, len - 1),
-        {
-          ...lastMsg,
-          content: suggestion,
-        },
-      ];
+      lastMsg.content = suggestion;
+      newList = [...messages.slice(0, len - 1), lastMsg];
+      messageStore.updateMessage(lastMsg);
     } else {
-      newList = [
-        ...message,
-        {
-          role: 'assistant',
-          content: suggestion,
-        },
-      ];
+      const newMsg: Message = {
+        id: `${Date.now()}`,
+        sessionId: session.id,
+        role: 'assistant',
+        content: suggestion,
+      };
+      messageStore.addMessage(newMsg);
+      newList = [...messages, newMsg];
     }
-    chatStorage.updateMessage(sessionId, newList);
-    setMessage(newList);
+    setMessageList(newList);
   };
-  /* const setChatLogs = (logs: MessageList) => {
-    setMessages(logs);
-    updateChatLogs(sessionId, logs);
-  }; */
+
   const onSubmit = async () => {
+    if (!localStorage[API_KEY]) {
+      debugger;
+      await new Promise((resolve) => {
+        events.emit('needToken', resolve);
+      });
+    }
     if (loading) {
       chatService.cancel();
       return;
     }
     if (!prompt.trim()) return;
-    let list: MessageList = [
-      ...message,
-      {
-        role: 'user',
-        content: prompt,
-      },
-    ];
-    setMessage(list);
-    chatStorage.updateMessage(sessionId, list);
+    if (!messages.length) {
+      // 最多只能有一个空会话
+      localStorage.emptySessionId = '';
+    }
+    const lastMsg: Message = {
+      id: `${Date.now()}`,
+      role: 'user',
+      content: prompt,
+      sessionId: session.id,
+    };
+    messageStore.addMessage(lastMsg);
+    let list: MessageList = [...messages, lastMsg];
+    setMessageList(list);
     setLoading(true);
     chatService.getStream({
       prompt,
-      history: list.slice(-assistant!.max_log),
+      history: list.slice(-assistant!.max_log).map((it) => {
+        const newIt: any = {
+          ...it,
+        };
+        delete newIt.id;
+        delete newIt.sessionId;
+        return newIt as SendMessage;
+      }),
       options: assistant,
     });
     setPrompt('');
@@ -123,7 +139,7 @@ const Message = ({ sessionId, assistant }: Props) => {
           'rounded-sm',
           'px-8',
         ])}>
-        {message.map((item, idx) => {
+        {messages.map((item, idx) => {
           const isUser = item.role === 'user';
           const isLight = colorScheme === 'light';
           return (
@@ -139,9 +155,15 @@ const Message = ({ sessionId, assistant }: Props) => {
               )}>
               <div>
                 {USERMAP[item.role]}
-                {!isUser && idx === message.length - 1 && loading && (
-                  <Loader size='sm' variant='dots' className='ml-2' />
-                )}
+                {!isUser &&
+                  idx === messages.length - 1 &&
+                  loading && (
+                    <Loader
+                      size='sm'
+                      variant='dots'
+                      className='ml-2'
+                    />
+                  )}
               </div>
               <div
                 className={clsx(
@@ -200,4 +222,4 @@ const Message = ({ sessionId, assistant }: Props) => {
     </>
   );
 };
-export default Message;
+export default MessageComp;

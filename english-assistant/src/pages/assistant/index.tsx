@@ -1,10 +1,9 @@
 import { AssistantList, EditAssistant } from '@/types';
-import assistionStore from '@/utils/assistionStore';
+import * as assistionStore from '@/dbs/assistantStore';
 import { ASSISTANT_INIT } from '@/utils/constant';
 import { useDisclosure } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import React, { useEffect, useState } from 'react';
-import assistantStore from '@/utils/assistionStore';
 import { Link } from 'react-router-dom';
 import {
   ActionIcon,
@@ -39,12 +38,11 @@ const Assistant = () => {
   const [editAssistant, setEditAssistant] = useState<EditAssistant>();
 
   useEffect(() => {
-    const list = assistantStore.getList();
-    setAssistantList(list);
+    assistionStore.getList().then(setAssistantList);
   }, []);
-  const saveAssistant = (data: EditAssistant) => {
+  const saveAssistant = async (data: EditAssistant) => {
     if (data.id) {
-      let newAssistantList = assistionStore.updateAssistant(
+      let newAssistantList = await assistionStore.updateAssistant(
         data.id,
         data
       );
@@ -54,16 +52,16 @@ const Assistant = () => {
         ...data,
         id: Date.now().toString(),
       };
-      let newAssistantList =
-        assistionStore.addAssistantList(newAssistant);
+      const newAssistantList =
+        await assistionStore.addAssistant(newAssistant);
       setAssistantList(newAssistantList);
     }
     showNotification('保存成功');
     drawerHandler.close();
   };
 
-  const removeAssistant = (id: string) => {
-    let newAssistantList = assistionStore.removeAssistant(id);
+  const removeAssistant = async (id: string) => {
+    let newAssistantList = await assistionStore.removeAssistant(id);
     setAssistantList(newAssistantList);
     showNotification('移除成功');
     drawerHandler.close();

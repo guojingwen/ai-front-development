@@ -1,4 +1,4 @@
-import { Message, MessageList } from '@/types';
+import { Message, MessageList, Model, SendMessage } from '@/types';
 import {
   ParsedEvent,
   ReconnectInterval,
@@ -10,18 +10,12 @@ interface StreamParamsOptions {
   temperature?: number;
   max_tokens?: number;
   prompt: string;
+  model: Model;
 }
 type StreamParams = {
   prompt: string;
-  history?: Message[];
+  history?: SendMessage[];
   options?: StreamParamsOptions;
-};
-type StreamPayload = {
-  model: string;
-  messages: MessageList;
-  temperature?: number;
-  stream: boolean;
-  max_tokens?: number;
 };
 
 type Actions = {
@@ -55,7 +49,7 @@ class ChatService {
         },
         method: 'POST',
         body: JSON.stringify({
-          model: 'gpt-3.5-turbo',
+          model: options.model,
           messages: [
             {
               role: 'system',

@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Select } from '@mantine/core';
 import { Assistant, AssistantList } from '@/types';
-import assistantStore from '@/utils/assistionStore';
-
+import * as assistantStore from '@/dbs/assistantStore';
 type Props = {
   value: string;
   loading?: boolean;
@@ -15,12 +14,12 @@ export default function AssistantSelect({
 }: Props) {
   const [list, setList] = useState<AssistantList>([]);
   useEffect(() => {
-    const store = assistantStore.getList();
-    setList(store);
+    assistantStore.getList().then(setList);
   }, []);
 
   const onAssistantChange = (value: string) => {
     const assistant = list.find((item) => item.id === value)!;
+    localStorage.assistantId = assistant.id;
     onChange(assistant);
   };
   return (
