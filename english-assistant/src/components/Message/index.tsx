@@ -1,21 +1,28 @@
 import chatService from '@/utils/chatService';
 import { Markdown } from '../Markdown';
-import { useEffect, useState, KeyboardEvent } from 'react';
+import {
+  useEffect,
+  useState,
+  KeyboardEvent,
+  useRef,
+  useContext,
+} from 'react';
 import {
   ActionIcon,
-  Textarea,
-  Loader,
+  Input,
   useMantineColorScheme,
 } from '@mantine/core';
 import * as messageStore from '@/dbs/messageStore';
 import {
   IconSend,
   IconSendOff,
-  IconEraser,
+  IconRobot,
+  IconUser,
 } from '@tabler/icons-react';
 import { API_KEY, USERMAP } from '@/utils/constant';
 import events from '@/utils/event';
-
+import './message.css';
+import { IconKeyboard, IconMicrophone } from '@tabler/icons-react';
 import {
   Assistant,
   Message,
@@ -24,6 +31,7 @@ import {
   Session,
 } from '@/types';
 import clsx from 'clsx';
+import { Voice } from '../Voice';
 
 type Props = {
   session: Session;
@@ -33,13 +41,14 @@ const MessageComp = ({ session, assistant }: Props) => {
   const [prompt, setPrompt] = useState('');
   const [loading, setLoading] = useState(false);
   const [messages, setMessageList] = useState<MessageList>([]);
-
+  const scrollRef = useRef<HTMLDivElement>();
+  const [mode, setMode] = useState('text');
   const { colorScheme } = useMantineColorScheme();
 
   chatService.actions = {
     onCompleting: (sug) => setSuggestion(sug),
     onCompleted: () => {
-      console.log('onCompleted');
+      // console.log('onCompleted');
       setLoading(false);
     },
   };
@@ -55,10 +64,7 @@ const MessageComp = ({ session, assistant }: Props) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session.id]);
 
-  const onClear = () => {
-    console.log('todo onClear');
-  };
-  const onKeyDown = (evt: KeyboardEvent<HTMLTextAreaElement>) => {
+  const onKeyDown = (evt: KeyboardEvent<HTMLInputElement>) => {
     if (evt.keyCode === 13 && !evt.shiftKey) {
       evt.preventDefault();
       onSubmit();
@@ -84,12 +90,12 @@ const MessageComp = ({ session, assistant }: Props) => {
       messageStore.addMessage(newMsg);
       newList = [...messages, newMsg];
     }
+    scrollRef.current!.scrollTop += 200;
     setMessageList(newList);
   };
 
   const onSubmit = async () => {
     if (!localStorage[API_KEY]) {
-      debugger;
       await new Promise((resolve) => {
         events.emit('needToken', resolve);
       });
@@ -111,8 +117,12 @@ const MessageComp = ({ session, assistant }: Props) => {
     };
     messageStore.addMessage(lastMsg);
     let list: MessageList = [...messages, lastMsg];
-    setMessageList(list);
     setLoading(true);
+    setMessageList(list);
+    // requestIdleCallback safari不兼容
+    setTimeout(() => {
+      scrollRef.current!.scrollTop += 200;
+    }, 20);
     chatService.getStream({
       prompt,
       history: list.slice(-assistant!.max_log).map((it) => {
@@ -127,6 +137,7 @@ const MessageComp = ({ session, assistant }: Props) => {
     });
     setPrompt('');
   };
+  const isLight = colorScheme === 'light';
 
   return (
     <>
@@ -135,57 +146,64 @@ const MessageComp = ({ session, assistant }: Props) => {
           'flex-col',
           'h-[calc(100vh-10rem)]',
           'w-full',
+          'max-w-2xl',
           'overflow-y-auto',
           'rounded-sm',
           'px-8',
-        ])}>
+        ])}
+        ref={(_ref) => (scrollRef.current = _ref!)}>
         {messages.map((item, idx) => {
           const isUser = item.role === 'user';
-          const isLight = colorScheme === 'light';
           return (
-            <div
-              key={`${item.role}-${idx}`}
-              className={clsx(
-                {
-                  flex: isUser,
-                  'flex-col': isUser,
-                  'items-end': isUser,
-                },
-                'mt-4'
-              )}>
-              <div>
-                {USERMAP[item.role]}
-                {!isUser &&
-                  idx === messages.length - 1 &&
-                  loading && (
-                    <Loader
-                      size='sm'
-                      variant='dots'
-                      className='ml-2'
-                    />
+            <div key={`${item.role}-${idx}`} className={clsx('mt-4')}>
+              <div className={clsx('flex', 'flex-row', 'mb-10')}>
+                <div
+                  className={clsx(
+                    {
+                      'bg-violet-600': !isUser,
+                      'bg-sky-500': isUser,
+                    },
+                    'flex-none',
+                    'mr-4',
+                    'rounded-full',
+                    'h-8',
+                    'w-8',
+                    'flex',
+                    'justify-center',
+                    'items-center'
+                  )}>
+                  {isUser ? (
+                    <IconUser color='white' size={24} />
+                  ) : (
+                    <IconRobot color='white' size={24} />
                   )}
-              </div>
-              <div
-                className={clsx(
-                  {
-                    'bg-gray-100': isLight,
-                    'bg-zinc-700/40': !isLight,
-                    'whitespace-break-spaces': isUser,
-                  },
-                  'rounded-md',
-                  'shadow-md',
-                  'px-4',
-                  'py-2',
-                  'mt-1',
-                  'w-full',
-                  'max-w-4xl',
-                  'min-h-[3rem]'
-                )}>
-                {isUser ? (
-                  <div>{item.content}</div>
-                ) : (
-                  <Markdown markdownText={item.content}></Markdown>
-                )}
+                </div>
+                <div className='flex flex-col'>
+                  <div className='text-lg font-medium'>
+                    {USERMAP[item.role]}
+                  </div>
+                  <div
+                    className={clsx(
+                      {
+                        'whitespace-break-spaces': isUser,
+                      },
+                      'w-full',
+                      'max-w-4xl',
+                      'min-h-[1rem]'
+                    )}>
+                    {isUser ? (
+                      <div>{item.content}</div>
+                    ) : (
+                      <Markdown
+                        markdownText={
+                          item.content +
+                          (idx === messages.length - 1 && loading
+                            ? `<span style='display: inline-block;width:0.8rem;height:0.8rem;border-radius:50%;background-color:#333;margin-left:0.1rem'><span>`
+                            : '')
+                        }></Markdown>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           );
@@ -195,29 +213,61 @@ const MessageComp = ({ session, assistant }: Props) => {
         className={clsx(
           'flex',
           'items-center',
-          'justify-center',
-          'self-end',
           'my-4',
-          'w-full'
+          'w-full',
+          'max-w-xl'
         )}>
         <ActionIcon
-          className='mr-2'
-          disabled={loading}
-          onClick={() => onClear()}>
-          <IconEraser></IconEraser>
+          onClick={() => setMode(mode === 'text' ? 'audio' : 'text')}>
+          {mode !== 'text' ? (
+            <IconKeyboard
+              size={30}
+              color={isLight ? '#333' : '#ccc'}
+            />
+          ) : (
+            <IconMicrophone
+              size={30}
+              color={isLight ? '#333' : '#ccc'}
+            />
+          )}
         </ActionIcon>
-        <Textarea
-          placeholder='Enter 发送消息；Shift + Enter 换行；'
-          className='w-3/5'
-          value={prompt}
-          disabled={loading}
-          onKeyDown={(evt) => onKeyDown(evt)}
-          onChange={(evt) => setPrompt(evt.target.value)}></Textarea>
-        <ActionIcon className='ml-2' onClick={() => onSubmit()}>
-          {/* loading={loading} */}
-          {loading ? <IconSendOff /> : <IconSend />}
-          {/* <IconSend></IconSend> */}
-        </ActionIcon>
+
+        <div className='ml-2 w-full flex items-center rounded-2xl border-solid border border-slate-300 overflow-hidden'>
+          {mode === 'text' ? (
+            <>
+              <Input
+                placeholder='Enter 发送消息；Shift + Enter 换行；'
+                className={clsx([
+                  {
+                    'placeholder:text-slate-200': !isLight,
+                    'bg-black/10': !isLight,
+                  },
+                  'w-full',
+                  'border-0',
+                  'ml-3',
+                  'h-12',
+                ])}
+                value={prompt}
+                onKeyDown={(evt) => onKeyDown(evt)}
+                onChange={(evt) =>
+                  setPrompt(evt.target.value)
+                }></Input>
+              <ActionIcon className='mr-1' onClick={() => onSubmit()}>
+                {/* loading={loading} */}
+                {loading ? (
+                  <IconSendOff color='#333' />
+                ) : (
+                  <IconSend color={prompt ? '#333' : '#ccc'} />
+                )}
+                {/* <IconSend></IconSend> */}
+              </ActionIcon>
+            </>
+          ) : (
+            <Voice
+              sessionId={session.id}
+              assistant={assistant!}></Voice>
+          )}
+        </div>
       </div>
     </>
   );

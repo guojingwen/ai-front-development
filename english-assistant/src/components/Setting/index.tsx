@@ -28,6 +28,9 @@ export default function Setting() {
       drawerHandler.open();
     });
     setApiKey(localStorage[API_KEY] || '');
+    return () => {
+      events.off('needToken');
+    };
   }, []);
   return (
     <div>

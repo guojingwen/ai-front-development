@@ -61,6 +61,9 @@ const SessionComp = ({ session, onChange }: Props) => {
         createSession();
       }
     });
+    return () => {
+      events.off('switchToNewSession');
+    };
   }, []);
   const removeSession = async (id: string) => {
     if (localStorage.emptySessionId === id) {
@@ -85,8 +88,9 @@ const SessionComp = ({ session, onChange }: Props) => {
       className={clsx(
         {
           'bg-black/10': colorScheme === 'dark',
-          'bg-gray-100': colorScheme === 'light',
+          'bg-gray-1s00': colorScheme === 'light',
         },
+        'shadow',
         'h-screen',
         'w-64',
         'flex',

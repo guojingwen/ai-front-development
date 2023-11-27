@@ -6,12 +6,14 @@ import * as sessionStore from '@/dbs/sessionStore';
 import * as assistantStore from '@/dbs/assistantStore';
 import { Assistant, Session } from '@/types';
 import events from '@/utils/event';
+import { MediaQuery } from '@mantine/core';
 
 export default function Home() {
   const [session, setSession] = useState<Session>({} as Session);
   const [assistant, setAssistant] = useState<Assistant>(
     {} as Assistant
   );
+
   const onAssistantChange = (_assistant: Assistant) => {
     if (_assistant.id === assistant.id) return;
     if (localStorage.emptySessionId !== session.id) {
@@ -45,9 +47,18 @@ export default function Home() {
   if (!session.id) return <div>loading</div>;
   return (
     <div className='h-screen w-screen flex'>
-      <SessionComp
-        session={session}
-        onChange={toSetSession}></SessionComp>
+      <MediaQuery
+        smallerThan='md'
+        styles={{
+          width: '0 !important',
+          padding: '0 !important',
+          overflow: 'hidden',
+        }}>
+        <SessionComp
+          session={session}
+          onChange={toSetSession}></SessionComp>
+      </MediaQuery>
+
       <div className='h-screen w-full flex flex-col items-center'>
         <NavHeader
           assistantId={assistant?.id || ''}
