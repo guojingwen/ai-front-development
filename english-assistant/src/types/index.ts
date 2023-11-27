@@ -1,14 +1,22 @@
 export type Role = 'user' | 'assistant' | 'system';
+export type AudioState = 'loading' | 'playing' | 'done';
 export type Message = {
   id: string;
   sessionId: string;
   role: Role;
   content: string;
+  audioKey?: number;
+  audioState?: AudioState;
 };
 export type ToObj<T extends object> = {
   [P in keyof T]: T[P];
 };
-export type SendMessage = Omit<Message, 'id' | 'sessionId'>;
+export type MessageAndIndex = ToObj<Message & { index?: number }>;
+
+export type SendMessage = Omit<
+  Message,
+  'id' | 'sessionId' | 'audioKey' | 'audioState'
+>;
 
 export type MessageList = Message[];
 

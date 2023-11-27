@@ -26,6 +26,7 @@ import { Assistant } from '@/types';
 import {
   ASSISTANT_INIT,
   ASSISTANT_STORE,
+  AUDIO_STORE,
   MESSAGE_STORE,
   SESSION_STORE,
 } from '@/utils/constant';
@@ -38,7 +39,7 @@ let dbInstance: Promise<IDBDatabase> = new Promise(
     _reject = reject;
   }
 );
-const request = window.indexedDB.open('english-assistant', 1);
+const request = window.indexedDB.open('english-assistant', 2);
 request.onerror = function (event) {
   console.log('onerror', event);
   _reject(event);
@@ -63,11 +64,18 @@ request.onupgradeneeded = function (event) {
       keyPath: 'id',
     });
   }
+  // 版本2 新增表，存储语音
+  if (!names.contains(AUDIO_STORE)) {
+    db.createObjectStore(AUDIO_STORE, {
+      autoIncrement: true,
+    });
+  }
 };
 request.onsuccess = async function (event) {
   console.log('onsuccess', event);
   _resolve(request.result);
   console.log('数据库打开成功');
+  (window as any).myDb = request.result;
 };
 
 export default dbInstance;

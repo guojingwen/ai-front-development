@@ -3,6 +3,7 @@ import { Model } from '@/types';
 export const MESSAGE_STORE = 'ai_assistant_message';
 export const SESSION_STORE = 'ai_assistant_session';
 export const ASSISTANT_STORE = 'ai_assistant';
+export const AUDIO_STORE = 'ai_assistant_audio';
 export const API_KEY = 'ai_api_key';
 
 export const MAX_TOKEN = 1000;

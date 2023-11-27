@@ -4,31 +4,22 @@ import {
   IconMicrophone,
   IconLoader2,
   IconPointer,
-  IconCircle,
 } from '@tabler/icons-react';
-import * as messageStore from '@/dbs/messageStore';
-import { Assistant } from '@/types';
 import MicroRecorder from 'mic-recorder-to-mp3';
-import voiceRequest from '@/api/voice';
 import clsx from 'clsx';
+import events from '@/utils/event';
 
 const Mp3Recorder = new MicroRecorder({
   bitRate: 1128,
 });
-export function Voice({
-  sessionId,
-  assistant,
-}: {
-  sessionId: string;
-  assistant: Assistant;
-}) {
+
+export function Voice() {
   const [isRecording, setIsRecording] = useState(false);
   const [isGranted, setIsGranted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(false);
   const isDisabled = useMemo(() => {
-    return isLoading || !isGranted || isPlaying;
-  }, [isLoading, isGranted, isPlaying]);
+    return isLoading || !isGranted;
+  }, [isLoading, isGranted]);
   const { colorScheme } = useMantineColorScheme();
   const isLight = colorScheme === 'light';
   // get audio granted
@@ -52,35 +43,14 @@ export function Voice({
       .getMp3()
       .then(([buffer, blob]: any) => {
         setIsRecording(false);
-        answer(blob);
+        setIsLoading(true);
+        return new Promise((resolve) => {
+          events.emit('audioData', [blob, resolve]);
+        });
+      })
+      .then(() => {
+        setIsLoading(false);
       });
-  };
-
-  const answer = async (blob: Blob) => {
-    setIsLoading(true);
-    // todo remove id sessionId
-    const history = await messageStore.getMessages(sessionId);
-
-    const resp = await voiceRequest({
-      file: new File([blob], 'prompt.mp3'),
-      history: history.slice(-assistant.max_log),
-      options: assistant,
-    });
-    const { audioUrl, transcription, completion } = await resp.json();
-    setIsLoading(false);
-    console.log(audioUrl, transcription, completion);
-    // setVideoMsg(completion);
-    const audioElement = new Audio(
-      `data:audio/wav;base64,${audioUrl}`
-    );
-    audioElement.addEventListener('play', () => {
-      setIsPlaying(true);
-    });
-    audioElement.addEventListener('ended', () => {
-      setIsPlaying(false);
-    });
-    audioElement.play();
-    console.log(resp);
   };
 
   return (
@@ -95,13 +65,6 @@ export function Voice({
             size='1rem'
             className='animate-spin mr-2'></IconLoader2>
           加载中...
-        </div>
-      ) : isPlaying ? (
-        <div className='flex items-center text-slate-500'>
-          <IconCircle
-            className='animate-ping mr-2'
-            size='1rem'></IconCircle>
-          Playing
         </div>
       ) : (
         <div

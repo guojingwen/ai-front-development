@@ -23,7 +23,6 @@ export const Markdown = (props: IProps) => {
     renderer,
   });
   const html = marked(markdownText);
-  // console.log(html === markdownText);
   return (
     <div
       dangerouslySetInnerHTML={{ __html: html }}

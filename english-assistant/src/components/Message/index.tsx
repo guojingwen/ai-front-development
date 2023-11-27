@@ -1,55 +1,67 @@
 import chatService from '@/utils/chatService';
-import { Markdown } from '../Markdown';
-import {
-  useEffect,
-  useState,
-  KeyboardEvent,
-  useRef,
-  useContext,
-} from 'react';
+import { useEffect, useState, KeyboardEvent, useRef } from 'react';
 import {
   ActionIcon,
   Input,
   useMantineColorScheme,
 } from '@mantine/core';
 import * as messageStore from '@/dbs/messageStore';
+import * as audioStore from '@/dbs/audioStore';
 import {
   IconSend,
   IconSendOff,
   IconRobot,
   IconUser,
 } from '@tabler/icons-react';
-import { API_KEY, USERMAP } from '@/utils/constant';
+import { API_KEY } from '@/utils/constant';
 import events from '@/utils/event';
 import './message.css';
 import { IconKeyboard, IconMicrophone } from '@tabler/icons-react';
 import {
   Assistant,
   Message,
+  MessageAndIndex,
   MessageList,
   SendMessage,
   Session,
 } from '@/types';
 import clsx from 'clsx';
 import { Voice } from '../Voice';
+import React from 'react';
+import OpenAI from 'openai';
+import {
+  arrayBufferToBase64,
+  audioInst,
+  blobToBase64,
+} from '@/utils/utils';
+import { useGetState } from '@/utils/hooks';
+import MessageContent from './MessageContent';
 
 type Props = {
   session: Session;
   assistant: Assistant;
 };
+
+const NewVoice = React.memo(Voice);
+let _resolve: any;
 const MessageComp = ({ session, assistant }: Props) => {
   const [prompt, setPrompt] = useState('');
   const [loading, setLoading] = useState(false);
-  const [messages, setMessageList] = useState<MessageList>([]);
+  const [messages, setMessageList, getMessageList] =
+    useGetState<MessageList>([]);
   const scrollRef = useRef<HTMLDivElement>();
   const [mode, setMode] = useState('text');
   const { colorScheme } = useMantineColorScheme();
 
   chatService.actions = {
     onCompleting: (sug) => setSuggestion(sug),
-    onCompleted: () => {
-      // console.log('onCompleted');
-      setLoading(false);
+    onCompleted: (sug: string) => {
+      if (mode === 'text') {
+        setLoading(false);
+      } else {
+        _resolve?.(sug);
+        setLoading(false);
+      }
     },
   };
 
@@ -94,7 +106,7 @@ const MessageComp = ({ session, assistant }: Props) => {
     setMessageList(newList);
   };
 
-  const onSubmit = async () => {
+  const onSubmit = async (_prompt?: string, audioKey?: number) => {
     if (!localStorage[API_KEY]) {
       await new Promise((resolve) => {
         events.emit('needToken', resolve);
@@ -104,33 +116,35 @@ const MessageComp = ({ session, assistant }: Props) => {
       chatService.cancel();
       return;
     }
-    if (!prompt.trim()) return;
-    if (!messages.length) {
+    const newPrompt = prompt.trim() || _prompt;
+    if (!newPrompt) return;
+    const _msgs = getMessageList();
+    if (!_msgs.length) {
       // 最多只能有一个空会话
       localStorage.emptySessionId = '';
     }
     const lastMsg: Message = {
       id: `${Date.now()}`,
       role: 'user',
-      content: prompt,
+      content: newPrompt,
       sessionId: session.id,
+      audioKey,
     };
     messageStore.addMessage(lastMsg);
-    let list: MessageList = [...messages, lastMsg];
+    let list: MessageList = [..._msgs, lastMsg];
     setLoading(true);
     setMessageList(list);
     // requestIdleCallback safari不兼容
     setTimeout(() => {
       scrollRef.current!.scrollTop += 200;
-    }, 20);
+    }, 100);
     chatService.getStream({
       prompt,
       history: list.slice(-assistant!.max_log).map((it) => {
         const newIt: any = {
-          ...it,
+          role: it.role,
+          content: it.content,
         };
-        delete newIt.id;
-        delete newIt.sessionId;
         return newIt as SendMessage;
       }),
       options: assistant,
@@ -139,6 +153,107 @@ const MessageComp = ({ session, assistant }: Props) => {
   };
   const isLight = colorScheme === 'light';
 
+  useEffect(() => {
+    events.on('audioData', answer);
+    return () => {
+      events.off('audioData');
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session.id]);
+  const answer = async ([blob, __resolve]: [Blob, any]) => {
+    // 1 存储音频
+    const sendAudio = await blobToBase64(blob);
+    const audioKeyPromise = audioStore.addAudio(sendAudio);
+
+    // 2 speech to text
+    const client = new OpenAI({
+      apiKey: localStorage[API_KEY],
+      dangerouslyAllowBrowser: true,
+    });
+    const file = new File([blob], 'prompt.mp3');
+    const transcription = await client.audio.transcriptions.create({
+      file,
+      model: 'whisper-1',
+    });
+    onSubmit(transcription.text, await audioKeyPromise); // 请求
+
+    // 3 text completion
+    const respText = await new Promise((resolve) => {
+      _resolve = resolve;
+    });
+    __resolve(); // 更新 <NewVoice/> 状态
+
+    //  4. text to speech
+    const audio = await client.audio.speech.create({
+      model: 'tts-1',
+      voice: 'nova',
+      input: respText as string,
+    });
+    const arrayBuffer = await audio.arrayBuffer();
+    const audioBase64 = await arrayBufferToBase64(arrayBuffer);
+    // 存储
+    const audioKey = await audioStore.addAudio(audioBase64);
+    const msgs = getMessageList();
+    const lastMsg = msgs.at(-1)!;
+    lastMsg.audioKey = audioKey;
+    const len = msgs.length;
+    const newList = [...msgs.slice(0, len - 1), lastMsg];
+    messageStore.updateMessage(lastMsg);
+    playVoice(newList, audioBase64, len - 1);
+  };
+  const playVoice = (
+    msgs: MessageList,
+    audioBase64: string,
+    index: number
+  ) => {
+    const old = audioInst.getAddi();
+    const newList = msgs.slice();
+    if (old) {
+      newList.splice(old.index, 1, {
+        ...old,
+      });
+      delete (newList[old.index] as MessageAndIndex).index;
+      audioInst.stop();
+    }
+    newList[index].audioState = 'playing';
+
+    setMessageList(newList);
+    audioInst.play(
+      audioBase64,
+      {
+        ...newList[index],
+        index: index,
+      },
+      (msg: MessageAndIndex) => {
+        const list = getMessageList().slice();
+        list.splice(msg.index!, 1, {
+          ...msg,
+          audioState: 'done',
+        });
+        delete (list[msg.index!] as MessageAndIndex).index;
+        setMessageList(list);
+      }
+    );
+  };
+  const toSpeak = async (item: Message, i: number) => {
+    const newList = getMessageList().slice();
+    let audioState = item.audioState;
+    if (audioState === 'loading') return;
+    if (audioState === 'playing') {
+      audioInst.stop();
+      audioState = 'done';
+      const newItem: Message = {
+        ...item,
+        audioState,
+      };
+      newList.splice(i, 1, newItem);
+      setMessageList(newList);
+    } else {
+      audioState = 'playing';
+      const audioBase64 = await audioStore.getAudio(item.audioKey!);
+      playVoice(newList, audioBase64, i);
+    }
+  };
   return (
     <>
       <div
@@ -178,32 +293,12 @@ const MessageComp = ({ session, assistant }: Props) => {
                     <IconRobot color='white' size={24} />
                   )}
                 </div>
-                <div className='flex flex-col'>
-                  <div className='text-lg font-medium'>
-                    {USERMAP[item.role]}
-                  </div>
-                  <div
-                    className={clsx(
-                      {
-                        'whitespace-break-spaces': isUser,
-                      },
-                      'w-full',
-                      'max-w-4xl',
-                      'min-h-[1rem]'
-                    )}>
-                    {isUser ? (
-                      <div>{item.content}</div>
-                    ) : (
-                      <Markdown
-                        markdownText={
-                          item.content +
-                          (idx === messages.length - 1 && loading
-                            ? `<span style='display: inline-block;width:0.8rem;height:0.8rem;border-radius:50%;background-color:#333;margin-left:0.1rem'><span>`
-                            : '')
-                        }></Markdown>
-                    )}
-                  </div>
-                </div>
+                <MessageContent
+                  index={idx}
+                  message={item}
+                  toSpeak={toSpeak}
+                  showWriting={idx === messages.length - 1 && loading}
+                />
               </div>
             </div>
           );
@@ -218,6 +313,7 @@ const MessageComp = ({ session, assistant }: Props) => {
           'max-w-xl'
         )}>
         <ActionIcon
+          disabled={loading}
           onClick={() => setMode(mode === 'text' ? 'audio' : 'text')}>
           {mode !== 'text' ? (
             <IconKeyboard
@@ -231,7 +327,6 @@ const MessageComp = ({ session, assistant }: Props) => {
             />
           )}
         </ActionIcon>
-
         <div className='ml-2 w-full flex items-center rounded-2xl border-solid border border-slate-300 overflow-hidden'>
           {mode === 'text' ? (
             <>
@@ -253,19 +348,15 @@ const MessageComp = ({ session, assistant }: Props) => {
                   setPrompt(evt.target.value)
                 }></Input>
               <ActionIcon className='mr-1' onClick={() => onSubmit()}>
-                {/* loading={loading} */}
                 {loading ? (
                   <IconSendOff color='#333' />
                 ) : (
                   <IconSend color={prompt ? '#333' : '#ccc'} />
                 )}
-                {/* <IconSend></IconSend> */}
               </ActionIcon>
             </>
           ) : (
-            <Voice
-              sessionId={session.id}
-              assistant={assistant!}></Voice>
+            <NewVoice />
           )}
         </div>
       </div>

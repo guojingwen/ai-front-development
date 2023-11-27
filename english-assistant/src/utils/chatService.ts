@@ -1,4 +1,4 @@
-import { Message, MessageList, Model, SendMessage } from '@/types';
+import { Model, SendMessage } from '@/types';
 import {
   ParsedEvent,
   ReconnectInterval,

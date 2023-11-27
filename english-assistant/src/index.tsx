@@ -20,10 +20,10 @@ const root = ReactDOM.createRoot(
 );
 initDB().then(() =>
   root.render(
-    <React.StrictMode>
-      <App>
-        <RouterProvider router={router} />
-      </App>
-    </React.StrictMode>
+    // <React.StrictMode>
+    <App>
+      <RouterProvider router={router} />
+    </App>
+    // </React.StrictMode>
   )
 );
