@@ -3,8 +3,6 @@ import AssistantSelect from '../AssistantSelect';
 import { ThemeSwitch } from '../ThemeSwitch';
 import { Assistant } from '@/types';
 import Setting from '../Setting';
-import { useContext } from 'react';
-import { ModeContext } from '@/utils/context';
 
 type Props = {
   assistantId: string;
@@ -14,7 +12,6 @@ export default function NavHeader({
   assistantId,
   onAssistantChange,
 }: Props) {
-  const mode = useContext(ModeContext);
   return (
     <div className='flex w-full justify-between items-center p-4 shadow-sm h-[6rem]'>
       <div className='flex flex-row justify-between items-center'>

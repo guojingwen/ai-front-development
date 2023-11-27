@@ -30,14 +30,18 @@ export const getMessages = async (id: string) => {
   return getAllMsgsBySessionId(objectStore, id);
 };
 export const addMessage = async (msg: Message): Promise<void> => {
-  const db = await dbInstance;
-  const transaction = db.transaction([MESSAGE_STORE], 'readwrite');
-  const objectStore = transaction.objectStore(MESSAGE_STORE);
-  objectStore.add(msg);
+  await updateMessage(msg, 'add');
 };
-export const updateMessage = async (msg: Message): Promise<void> => {
+export const updateMessage = async (
+  msg: Message,
+  type: 'put' | 'add' = 'put'
+): Promise<void> => {
   const db = await dbInstance;
+  const _msg = {
+    ...msg,
+  };
+  delete _msg.audioState; // 这个字段不入库
   const transaction = db.transaction([MESSAGE_STORE], 'readwrite');
   const objectStore = transaction.objectStore(MESSAGE_STORE);
-  objectStore.put(msg);
+  objectStore[type](_msg);
 };

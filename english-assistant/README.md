@@ -1,46 +1,29 @@
-# Getting Started with Create React App
+# ChatGPT API开发
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+项目目录如下
 
-## Available Scripts
+```txt
+|-
+  |- english-assistant 基于OpenAI API 开发一个英语学习助手
+  |- assistant ChatGPT接入钉钉、飞书、微信公众号的示例代码
+  |- langchain AI前端框架学习，结合企业场景写一些示例Demo
+```
 
-In the project directory, you can run:
+## 英语学习助手
 
-### `npm start`
+通过这个项目你可以快速上手ChatGPT的前端开发
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+- 首先要配置 `API_KEY` 这个在 [platform.openai.com](https://platform.openai.com/api-keys) 配置，[参考官方文档](https://platform.openai.com/docs/quickstart)
+- 项目技术栈 使用`React`+ `typescript`开发，样式使用 `tailwindcss`，UI使用`@mantine/core`，使用`indexedDB`存储无后端服务
+- 项目参考ChatGPT的UI布局，分三个模块，助理管理、会话列表、消息列表，左右布局，左边是会话列表，右边是消息列表，
+- 助理管理其实是 OpenAI官方的 接口配置，具体参数的含义请参考官网，这里不细说。通过配置不同的指令及其他参数实现不同的模式，如英语学习、语文学习等
+- 支持发送文字，支持打字效果、支持markdown渲染
+- 支持语音功能，类似微信语音，使用indexedDB存储，可回放。注意：官方并不支持直接语音，需要通过文字转语音，语音再转文字的接口中转
+- 支持白天晚上主题模式切换
 
-The page will reload if you make edits.\
-You will also see any lint errors in the console.
+项目中使用了一些设计模式
 
-### `npm test`
-
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
-
-### `npm run build`
-
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
-
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
-
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
-
-### `npm run eject`
-
-**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
-
-If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
-
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
-
-You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
-
-## Learn More
-
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
+- 单例模式： 语音播放、发送消息（对fetch的封装）
+- 发布订阅模式： 使用EventEmitter用于一些非父子组件间的通信
+- 门面模式：解决兼容性问题
+- 流水线模式：关于业务逻辑的处理采用pipeline模式，逻辑清晰

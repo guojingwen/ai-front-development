@@ -42,7 +42,6 @@ type Props = {
   assistant: Assistant;
 };
 
-const NewVoice = React.memo(Voice);
 let _resolve: any;
 const MessageComp = ({ session, assistant }: Props) => {
   const [prompt, setPrompt] = useState('');
@@ -50,13 +49,13 @@ const MessageComp = ({ session, assistant }: Props) => {
   const [messages, setMessageList, getMessageList] =
     useGetState<MessageList>([]);
   const scrollRef = useRef<HTMLDivElement>();
-  const [mode, setMode] = useState('text');
+  const [mode, setMode, getMode] = useGetState('text');
   const { colorScheme } = useMantineColorScheme();
 
   chatService.actions = {
     onCompleting: (sug) => setSuggestion(sug),
     onCompleted: (sug: string) => {
-      if (mode === 'text') {
+      if (getMode() === 'text') {
         setLoading(false);
       } else {
         _resolve?.(sug);
@@ -91,14 +90,21 @@ const MessageComp = ({ session, assistant }: Props) => {
     if (lastMsg?.role === 'assistant') {
       lastMsg.content = suggestion;
       newList = [...messages.slice(0, len - 1), lastMsg];
-      messageStore.updateMessage(lastMsg);
+      messageStore.updateMessage({
+        ...lastMsg,
+        audioState: undefined,
+      });
     } else {
       const newMsg: Message = {
         id: `${Date.now()}`,
         sessionId: session.id,
         role: 'assistant',
+        // -1 先标识为语音
+        audioKey: getMode() === 'audio' ? -1 : undefined,
+        audioState: 'loading',
         content: suggestion,
       };
+      console.log('新增消息', getMode(), suggestion, newMsg);
       messageStore.addMessage(newMsg);
       newList = [...messages, newMsg];
     }
@@ -138,6 +144,7 @@ const MessageComp = ({ session, assistant }: Props) => {
     setTimeout(() => {
       scrollRef.current!.scrollTop += 200;
     }, 100);
+    console.log('before chatService', assistant);
     chatService.getStream({
       prompt,
       history: list.slice(-assistant!.max_log).map((it) => {
@@ -159,7 +166,7 @@ const MessageComp = ({ session, assistant }: Props) => {
       events.off('audioData');
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session.id]);
+  }, [session.id, assistant.id]);
   const answer = async ([blob, __resolve]: [Blob, any]) => {
     // 1 存储音频
     const sendAudio = await blobToBase64(blob);
@@ -211,6 +218,7 @@ const MessageComp = ({ session, assistant }: Props) => {
     if (old) {
       newList.splice(old.index, 1, {
         ...old,
+        audioState: 'done',
       });
       delete (newList[old.index] as MessageAndIndex).index;
       audioInst.stop();
@@ -236,6 +244,7 @@ const MessageComp = ({ session, assistant }: Props) => {
     );
   };
   const toSpeak = async (item: Message, i: number) => {
+    console.log('toSpeak', item, i);
     const newList = getMessageList().slice();
     let audioState = item.audioState;
     if (audioState === 'loading') return;
@@ -356,7 +365,7 @@ const MessageComp = ({ session, assistant }: Props) => {
               </ActionIcon>
             </>
           ) : (
-            <NewVoice />
+            <Voice />
           )}
         </div>
       </div>

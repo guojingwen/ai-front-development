@@ -1,5 +1,4 @@
 import '@/styles/globals.css';
-// import '@/styles/atom-one-dark.css';
 import 'highlight.js/styles/atom-one-dark.css';
 import { useState } from 'react';
 import {

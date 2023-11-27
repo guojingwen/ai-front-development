@@ -1,6 +1,10 @@
 import { MessageList, Session, SessionList } from '@/types';
 import dbInstance from './db';
-import { MESSAGE_STORE, SESSION_STORE } from '@/utils/constant';
+import {
+  AUDIO_STORE,
+  MESSAGE_STORE,
+  SESSION_STORE,
+} from '@/utils/constant';
 
 const getAll = (
   objectStore: IDBObjectStore
@@ -59,25 +63,34 @@ export const updateSession = async (
   const db = await dbInstance;
   const transaction = db.transaction([SESSION_STORE], 'readwrite');
   const objectStore = transaction.objectStore(SESSION_STORE);
-  objectStore.put(session);
+  const request = objectStore.put(session);
+  await new Promise((resolve) => {
+    request.onsuccess = (event) => {
+      resolve(event);
+    };
+  });
   return getAll(objectStore);
 };
 export const removeSession = async (id: string): Promise<void> => {
   const db = await dbInstance;
   const transaction = db.transaction(
-    [SESSION_STORE, MESSAGE_STORE],
+    [SESSION_STORE, MESSAGE_STORE, AUDIO_STORE],
     'readwrite'
   );
   const objectStore = transaction.objectStore(SESSION_STORE);
   objectStore.delete(id)!;
   const objectStore2 = transaction.objectStore(MESSAGE_STORE);
   const request = objectStore2.getAll();
+  const objectStore3 = transaction.objectStore(AUDIO_STORE);
   await new Promise((resolve) => {
     request.onsuccess = (e) => {
       let list = (e.target as IDBRequest<MessageList>).result;
       list.forEach((item) => {
         if (item.sessionId === id) {
           objectStore2.delete(item.id);
+          if (item.audioKey) {
+            objectStore3.delete(item.audioKey);
+          }
         }
       });
       resolve(null);

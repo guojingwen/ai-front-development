@@ -18,7 +18,7 @@ export const ASSISTANT_INIT = [
     name: 'AI助手',
     prompt: '你是一个智慧的AI助手，任务是详细地回答用户的每一个问题',
     temperature: 0.7,
-    max_log: 10,
+    max_log: 20,
     max_tokens: 800,
     model: 'gpt-3.5-turbo' as Model,
   },
