@@ -144,7 +144,6 @@ const MessageComp = ({ session, assistant }: Props) => {
     setTimeout(() => {
       scrollRef.current!.scrollTop += 200;
     }, 100);
-    console.log('before chatService', assistant);
     chatService.getStream({
       prompt,
       history: list.slice(-assistant!.max_log).map((it) => {

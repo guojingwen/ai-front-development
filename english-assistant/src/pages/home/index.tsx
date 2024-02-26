@@ -35,11 +35,16 @@ export default function Home() {
 
   useEffect(() => {
     (async () => {
-      const assistants = await assistantStore.getList();
-      setAssistant(assistants[0]);
       const sessions = await sessionStore.getSessions();
       setSessionList(sessions);
       setSession(sessions[0]);
+      let assistantId = sessions[0].assistantId;
+      const assistants = await assistantStore.getList();
+      let _assistant = assistants.find(
+        (it) => it.id === assistantId
+      )!;
+      setAssistant(_assistant);
+      localStorage.assistantId = assistantId;
     })();
   }, []);
 

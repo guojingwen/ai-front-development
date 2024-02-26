@@ -26,7 +26,7 @@ const showNotification = (message: string) => {
     title: 'Success',
     message,
     color: 'green',
-    autoClose: 3000,
+    autoClose: 2000,
   });
 };
 

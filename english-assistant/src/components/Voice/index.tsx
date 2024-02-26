@@ -8,11 +8,13 @@ import {
 import MicroRecorder from 'mic-recorder-to-mp3';
 import clsx from 'clsx';
 import events from '@/utils/event';
+import { notifications } from '@mantine/notifications';
 
 const Mp3Recorder = new MicroRecorder({
-  bitRate: 1128,
+  bitRate: 128,
 });
 
+let recordStart = Date.now();
 export function Voice() {
   const [isRecording, setIsRecording] = useState(false);
   const [isGranted, setIsGranted] = useState(false);
@@ -35,10 +37,22 @@ export function Voice() {
   });
   const start = () => {
     Mp3Recorder.start().then(() => {
+      recordStart = Date.now();
       setIsRecording(true);
     });
   };
   const end = () => {
+    if (Date.now() - recordStart < 1000) {
+      Mp3Recorder.stop();
+      notifications.show({
+        id: 'warning',
+        title: '',
+        message: '说话时间太短！',
+        autoClose: 2000,
+      });
+      setIsRecording(false);
+      return;
+    }
     Mp3Recorder.stop()
       .getMp3()
       .then(([buffer, blob]: any) => {
